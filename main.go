@@ -98,15 +98,15 @@ func send(device *hid.Device, message []byte) []byte {
 	if err != nil {
 		log.Fatalf("Failed to write message: %v\n", err)
 	}
-	fmt.Println("Read: ", length, " of data")
+	fmt.Println("Wrote: ", length, " bytes of data")
 	//records time when message was sent
 	//self.__lastsend = datetime.datetime.now()
 
-	var response []byte
+	response := make([]byte, 1024)
 	length, err = device.Read(response)
 	if err != nil {
 		log.Fatalf("Failed to read response: %v\n", err)
 	}
-
-	return response
+	fmt.Printf("read: %d bytes of data", length)
+	return response[:length]
 }
