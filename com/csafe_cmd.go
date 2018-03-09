@@ -5,17 +5,17 @@ import (
 	"log"
 )
 
-func _Int2bytes(numbytes uint, num uint) (result []uint) {
-	for k := uint(0); k < numbytes; k++ {
-		result = append(result, (num>>uint(8*k))&0xFF)
+func _Int2bytes(numbytes byte, num byte) (result []byte) {
+	for k := byte(0); k < numbytes; k++ {
+		result = append(result, (num>>byte(8*k))&0xFF)
 	}
 	return result
 }
 
-func _Bytes2int(rawBytes []uint) uint {
-	integer := uint(0)
+func _Bytes2int(rawBytes []byte) byte {
+	integer := byte(0)
 	for k, v := range rawBytes {
-		integer = (v << uint(8*k)) | integer
+		integer = (v << byte(8*k)) | integer
 	}
 	return integer
 
@@ -25,14 +25,14 @@ func _Bytes2ascii(rawBytes []byte) string {
 	return string(rawBytes)
 }
 
-func sum(values []uint) (result uint) {
+func sum(values []byte) (result byte) {
 	for _, v := range values {
 		result += v
 	}
 	return
 }
 
-func abs(value uint) uint {
+func abs(value byte) byte {
 	if value > 0 {
 		return value
 	}
@@ -40,16 +40,16 @@ func abs(value uint) uint {
 }
 
 // for sending
-func write(arguments ...uint) (message []uint) {
-	var wrapper uint
-	var wrapped []uint
-	maxresponse := uint(3) //start & stop flag & status
+func Write(arguments ...byte) (message []byte) {
+	var wrapper byte
+	var wrapped []byte
+	maxresponse := byte(3) //start & stop flag & status
 	i := 0
 	for i < len(arguments) {
 		argument := arguments[i]
 		cmdprop := Cmds[argument]
 		//fmt.Printf("%#v, %v\n", argument, cmdprop)
-		var command []uint
+		var command []byte
 		// load variables if command is a Long Command
 		if cmdprop.Variable != nil {
 			for _, varbyte := range *cmdprop.Variable {
@@ -59,16 +59,16 @@ func write(arguments ...uint) (message []uint) {
 				command = append(command, value...)
 			}
 			// data byte count
-			cmdbytes := uint(len(command))
-			command = append([]uint{cmdbytes}, command...)
+			cmdbytes := byte(len(command))
+			command = append([]byte{cmdbytes}, command...)
 		}
 		//add command id
-		command = append([]uint{cmdprop.ID}, command...)
+		command = append([]byte{cmdprop.ID}, command...)
 
 		// closes wrapper if required
 		if len(wrapped) > 0 && (cmdprop.Data != nil || (*cmdprop.Data)[0] != wrapper) {
-			wrapped = append([]uint{uint(len(wrapped))}, wrapped...) //data byte count for wrapper
-			wrapped = append([]uint{wrapper}, wrapped...)            //wrapper command id
+			wrapped = append([]byte{byte(len(wrapped))}, wrapped...) //data byte count for wrapper
+			wrapped = append([]byte{wrapper}, wrapped...)            //wrapper command id
 			message = append(message, wrapped...)                    // adds wrapper to message
 			wrapped = nil
 			wrapper = 0
@@ -87,9 +87,9 @@ func write(arguments ...uint) (message []uint) {
 		}
 
 		// max message length
-		cmdid := cmdprop.ID | (wrapper << 8)
+		cmdid := byte(cmdprop.ID) | (wrapper << 8)
 		// double return to account for stuffing
-		resp := Resps[cmdid]
+		resp := Resps[uint(cmdid)]
 		maxresponse += abs(sum(*resp.Bytes))*2 + 1
 
 		//add completed command to final message
@@ -99,13 +99,13 @@ func write(arguments ...uint) (message []uint) {
 
 	// closes wrapper if message ended on it
 	if len(wrapped) > 0 {
-		wrapped = append([]uint{uint(len(wrapped))}, wrapped...) //data byte count for wrapper
-		wrapped = append([]uint{wrapper}, wrapped...)            //wrapper command id
+		wrapped = append([]byte{byte(len(wrapped))}, wrapped...) //data byte count for wrapper
+		wrapped = append([]byte{wrapper}, wrapped...)            //wrapper command id
 		message = append(message, wrapped...)                    // adds wrapper to message
 	}
 
 	// prime variables
-	checksum := uint(0x0)
+	checksum := byte(0x0)
 	j := 0
 
 	// checksum and byte stuffing
@@ -128,7 +128,7 @@ func write(arguments ...uint) (message []uint) {
 	message = append(message, checksum)
 
 	// start & stop frames
-	message = append([]uint{StandardFrameStartFlag}, message...)
+	message = append([]byte{StandardFrameStartFlag}, message...)
 	message = append(message, StopFrameFlag)
 
 	// check for frame size (96 bytes)
@@ -137,20 +137,20 @@ func write(arguments ...uint) (message []uint) {
 	}
 
 	// report IDs
-	maxmessage := uint(len(message) + 1)
+	maxmessage := byte(len(message) + 1)
 	if maxresponse > maxmessage {
 		maxmessage = maxresponse
 	}
 
 	if maxmessage <= 21 {
-		message = append([]uint{0x01}, message...)
-		message = append(message, make([]uint, 21-len(message))...)
+		message = append([]byte{0x01}, message...)
+		message = append(message, make([]byte, 21-len(message))...)
 	} else if maxmessage <= 63 {
-		message = append([]uint{0x04}, message...)
-		message = append(message, make([]uint, 63-len(message))...)
+		message = append([]byte{0x04}, message...)
+		message = append(message, make([]byte, 63-len(message))...)
 	} else if (len(message) + 1) <= 121 {
-		message = append([]uint{0x02}, message...)
-		message = append(message, make([]uint, 121-len(message))...)
+		message = append([]byte{0x02}, message...)
+		message = append(message, make([]byte, 121-len(message))...)
 		if maxresponse > 121 {
 			log.Printf("Response may be too long to recieve.  Max possible length %v", maxresponse)
 		}
@@ -162,11 +162,11 @@ func write(arguments ...uint) (message []uint) {
 	return
 }
 
-func CheckMessage(input []uint) (message []uint) {
+func CheckMessage(input []byte) (message []byte) {
 	//prime variables
 	message = input
 	i := 0
-	checksum := uint(0)
+	checksum := byte(0)
 
 	//checksum and unstuff
 	for i < len(message) {
@@ -186,7 +186,7 @@ func CheckMessage(input []uint) (message []uint) {
 	//checks checksum
 	if checksum != 0 {
 		log.Println("Checksum error")
-		return []uint{}
+		return []byte{}
 	}
 
 	//remove checksum from  end of message
@@ -195,8 +195,8 @@ func CheckMessage(input []uint) (message []uint) {
 	return
 }
 
-func makeArray(length, value uint) []uint {
-	result := make([]uint, length)
+func makeArray(length, value byte) []byte {
+	result := make([]byte, length)
 	for i := range result {
 		result[i] = value
 	}
@@ -204,9 +204,9 @@ func makeArray(length, value uint) []uint {
 }
 
 // for recieving!!
-func read(transmission ...uint) (respone map[uint]*[]uint) {
+func Read(transmission ...byte) (respone map[byte]*[]byte) {
 	//prime variables
-	var message []uint
+	var message []byte
 	stopfound := false
 	//reportid = transmission[0]
 	startflag := transmission[1]
@@ -241,21 +241,21 @@ func read(transmission ...uint) (respone map[uint]*[]uint) {
 	status, message := message[0], message[1:]
 
 	//prime variables
-	var response = make(map[uint]*[]uint)
-	response[CSAFE_GETSTATUS_CMD] = &[]uint{status}
+	var response = make(map[byte]*[]byte)
+	response[CSAFE_GETSTATUS_CMD] = &[]byte{status}
 	var k int
 	wrapend := -1
-	wrapper := uint(0x0)
+	wrapper := byte(0x0)
 
 	for k < len(message) {
-		var result *[]uint
+		var result *[]byte
 
 		//get command name
 		msgcmd := message[k]
 		if k <= wrapend {
 			msgcmd = wrapper | msgcmd //check if still in wrapper
 		}
-		msgprop := Resps[msgcmd]
+		msgprop := Resps[uint(msgcmd)]
 		k++
 
 		//get data byte count
@@ -268,7 +268,7 @@ func read(transmission ...uint) (respone map[uint]*[]uint) {
 			wrapend = k + int(bytecount) - 1
 			if bytecount != 0 { //If wrapper length != 0
 				msgcmd = wrapper | message[k]
-				msgprop = Resps[msgcmd]
+				msgprop = Resps[uint(msgcmd)]
 				k++
 				bytecount = message[k]
 				k++
@@ -292,10 +292,10 @@ func read(transmission ...uint) (respone map[uint]*[]uint) {
 
 		//extract values
 		for _, numbytes := range *msgprop.Bytes {
-			rawBytes := message[uint(k) : uint(k)+abs(numbytes)]
+			rawBytes := message[byte(k) : byte(k)+abs(numbytes)]
 			var value = rawBytes
 			if numbytes >= 0 {
-				value = []uint{_Bytes2int(rawBytes)}
+				value = []byte{_Bytes2int(rawBytes)}
 			}
 			*result = append(*result, value...)
 			k = k + int(abs(numbytes))
